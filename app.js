@@ -12,6 +12,7 @@
     startBtn: document.querySelector('#startBtn'),
     resetBtn: document.querySelector('#resetBtn'),
     installBtn: document.querySelector('#installBtn'),
+    showGuide: document.querySelector('#showGuide'),
     guideCanvas: document.querySelector('#guideCanvas'),
     board: document.querySelector('#board'),
     boardWrap: document.querySelector('#boardWrap'),
@@ -39,7 +40,8 @@
     startedAt: 0,
     running: false,
     deferredPrompt: null,
-    resizeTimer: null
+    resizeTimer: null,
+    showGuide: true
   };
 
   function selectedDifficulty() {
@@ -204,6 +206,12 @@
     const ctx = els.guideCanvas.getContext('2d');
     ctx.scale(scale, scale);
     ctx.drawImage(sourceCanvas, 0, 0, width, height);
+    updateGuideVisibility();
+  }
+
+  function updateGuideVisibility() {
+    state.showGuide = Boolean(els.showGuide?.checked);
+    els.guideCanvas.classList.toggle('guide-hidden', !state.showGuide);
   }
 
   function scatterPieces() {
@@ -306,35 +314,44 @@
       if (!state.running || piece.locked) return;
       event.preventDefault();
       dragging = true;
-      el.setPointerCapture(event.pointerId);
-      el.classList.add('dragging');
 
       const rect = el.getBoundingClientRect();
       offsetX = event.clientX - rect.left;
       offsetY = event.clientY - rect.top;
 
-      if (piece.container !== 'board') {
-        const boardRect = els.boardWrap.getBoundingClientRect();
-        els.boardWrap.appendChild(el);
-        el.style.left = `${event.clientX - boardRect.left - offsetX}px`;
-        el.style.top = `${event.clientY - boardRect.top - offsetY}px`;
-        el.style.transform = 'rotate(0deg)';
-        piece.container = 'board';
-      }
+      // Move a peça para uma camada fixa durante o arraste. Isso evita que ela
+      // desapareça ao sair da bandeja ou entrar em um contêiner com overflow.
+      document.body.appendChild(el);
+      el.classList.add('dragging', 'drag-layer');
+      el.style.left = `${rect.left}px`;
+      el.style.top = `${rect.top}px`;
+      el.style.width = `${piece.canvasW}px`;
+      el.style.height = `${piece.canvasH}px`;
+      el.style.transform = 'rotate(0deg) scale(1.035)';
+
+      try { el.setPointerCapture(event.pointerId); } catch (_) {}
     });
 
     el.addEventListener('pointermove', (event) => {
       if (!dragging || piece.locked) return;
-      const boardRect = els.boardWrap.getBoundingClientRect();
-      el.style.left = `${event.clientX - boardRect.left - offsetX}px`;
-      el.style.top = `${event.clientY - boardRect.top - offsetY}px`;
+      event.preventDefault();
+      el.style.left = `${event.clientX - offsetX}px`;
+      el.style.top = `${event.clientY - offsetY}px`;
     });
 
     const release = (event) => {
       if (!dragging || piece.locked) return;
       dragging = false;
-      el.classList.remove('dragging');
       try { el.releasePointerCapture(event.pointerId); } catch (_) {}
+
+      const pieceRect = el.getBoundingClientRect();
+      const boardRect = els.boardWrap.getBoundingClientRect();
+      els.boardWrap.appendChild(el);
+      el.classList.remove('dragging', 'drag-layer');
+      el.style.left = `${pieceRect.left - boardRect.left}px`;
+      el.style.top = `${pieceRect.top - boardRect.top}px`;
+      el.style.transform = 'rotate(0deg)';
+      piece.container = 'board';
       testDrop(piece);
     };
 
@@ -402,6 +419,8 @@
     loadImageFile(event.target.files?.[0]);
   });
 
+
+  els.showGuide.addEventListener('change', updateGuideVisibility);
   els.startBtn.addEventListener('click', buildGame);
   els.resetBtn.addEventListener('click', resetGame);
   els.playAgainBtn.addEventListener('click', () => {

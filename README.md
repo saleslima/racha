@@ -32,3 +32,7 @@ No Laragon, copie a pasta para `C:\\laragon\\www` e abra pelo domínio local cri
 
 ## Mobile e offline
 A interface é responsiva para celulares e tablets. Após a primeira abertura online, os arquivos principais ficam em cache e a PWA pode ser reaberta sem internet. No GitHub Pages, aguarde a primeira carga completa antes de testar o modo avião.
+
+## Atualização
+- Corrigido o desaparecimento das peças durante o arraste em telas touch.
+- Adicionada opção para exibir ou ocultar a imagem-gabarito por baixo do tabuleiro.
