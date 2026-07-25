@@ -181,7 +181,7 @@ input[type="file"] {
   touch-action: none;
 }
 
-#guideCanvas { opacity: .16; pointer-events: none; }
+#guideCanvas { opacity: 1; pointer-events: none; }
 #finalCanvas { pointer-events: none; z-index: 1200; }
 .board { inset: 0; }
 

@@ -727,7 +727,7 @@
 
     // Ao escolher a mesma imagem, o tabuleiro volta a ficar completamente vazio.
     // Apenas a imagem continua carregada e todas as peças são recriadas no monte.
-    els.showGuide.checked = false;
+    els.showGuide.checked = true;
     updateGuideVisibility();
     clearBoard({ clearImage: false });
     state.board = { x: 0, y: 0, width: 0, height: 0 };
