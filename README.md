@@ -8,7 +8,7 @@ Criado por Marcio Sales Lima.
 - Upload de imagem por arquivo, sem abertura da câmera.
 - Fácil: 10 peças.
 - Médio: 30 peças.
-- Avançado: 60 peças.
+- Avançado: 60 peças com rotação em 0°, 90°, 180° e 270°.
 - Peças com recortes de quebra-cabeça.
 - Arraste por mouse ou toque.
 - Borda/sombra verde no encaixe correto.
@@ -36,3 +36,7 @@ A interface é responsiva para celulares e tablets. Após a primeira abertura on
 ## Atualização
 - Corrigido o desaparecimento das peças durante o arraste em telas touch.
 - Adicionada opção para exibir ou ocultar a imagem-gabarito por baixo do tabuleiro.
+
+- Peças colocadas em posição incorreta agora retornam automaticamente ao monte, sem desaparecer nem permanecer soltas no tabuleiro.
+
+- No nível Avançado, toque em uma peça ou use o botão “Girar peça” para rotacioná-la 90°. O encaixe só é aceito na orientação correta.

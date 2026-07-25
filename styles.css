@@ -136,6 +136,7 @@ input[type="file"] {
 .primary-btn { color: #fff; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
 .primary-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(109,40,217,.25); }
 .secondary-btn { background: #f0edf5; color: var(--text); }
+.rotate-btn { white-space: nowrap; }
 .ghost-btn { background: transparent; color: var(--primary); border: 1px solid #c4b5fd; }
 
 .status-panel {
@@ -208,6 +209,7 @@ input[type="file"] {
 .piece:hover { filter: drop-shadow(0 12px 14px rgba(31, 20, 45, .28)); }
 .piece.dragging { z-index: 999; cursor: grabbing; transform: scale(1.035); transition: none; }
 .piece.locked { cursor: default; filter: none; }
+.piece.selected:not(.locked) { filter: drop-shadow(0 0 7px rgba(109, 40, 217, .9)) drop-shadow(0 8px 10px rgba(31, 20, 45, .2)); }
 .piece.correct-flash { filter: drop-shadow(0 0 8px var(--green)) drop-shadow(0 0 3px var(--green)); }
 .piece.wrong-flash { filter: drop-shadow(0 0 8px var(--red)) drop-shadow(0 0 3px var(--red)); }
 

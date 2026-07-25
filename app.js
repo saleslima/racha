@@ -11,6 +11,8 @@
     imageInput: document.querySelector('#imageInput'),
     startBtn: document.querySelector('#startBtn'),
     resetBtn: document.querySelector('#resetBtn'),
+    rotateBtn: document.querySelector('#rotateBtn'),
+    advancedHelp: document.querySelector('#advancedHelp'),
     installBtn: document.querySelector('#installBtn'),
     showGuide: document.querySelector('#showGuide'),
     guideCanvas: document.querySelector('#guideCanvas'),
@@ -41,7 +43,8 @@
     running: false,
     deferredPrompt: null,
     resizeTimer: null,
-    showGuide: true
+    showGuide: true,
+    selectedPieceId: null
   };
 
   function selectedDifficulty() {
@@ -56,6 +59,42 @@
 
   function updateStatus(message) {
     els.statusText.textContent = message;
+  }
+
+  function isAdvancedMode() {
+    return state.running ? state.difficulty === 'hard' : selectedDifficulty() === 'hard';
+  }
+
+  function normalizedRotation(value) {
+    return ((Number(value) % 360) + 360) % 360;
+  }
+
+  function selectedPiece() {
+    return state.pieces.find((piece) => piece.id === state.selectedPieceId) || null;
+  }
+
+  function updateRotationControls() {
+    const advanced = isAdvancedMode();
+    els.rotateBtn.hidden = !advanced;
+    els.advancedHelp.hidden = !advanced;
+    const piece = selectedPiece();
+    els.rotateBtn.disabled = !advanced || !state.running || !piece || piece.locked;
+  }
+
+  function selectPiece(piece) {
+    state.pieces.forEach((item) => item.el?.classList.remove('selected'));
+    state.selectedPieceId = piece && !piece.locked ? piece.id : null;
+    if (piece && !piece.locked) piece.el.classList.add('selected');
+    updateRotationControls();
+  }
+
+  function rotatePiece(piece) {
+    if (!piece || piece.locked || state.difficulty !== 'hard') return;
+    piece.rotation = normalizedRotation((piece.rotation || 0) + 90);
+    piece.homeRotation = piece.rotation;
+    piece.el.style.transform = `rotate(${piece.rotation}deg)`;
+    selectPiece(piece);
+    updateStatus(`Peça girada para ${piece.rotation}°`);
   }
 
   function updateCounters() {
@@ -214,22 +253,45 @@
     els.guideCanvas.classList.toggle('guide-hidden', !state.showGuide);
   }
 
+  function returnPieceToTray(piece, { flash = false } = {}) {
+    const trayRect = els.tray.getBoundingClientRect();
+    const maxX = Math.max(0, trayRect.width - piece.canvasW - 8);
+    const maxY = Math.max(0, trayRect.height - piece.canvasH - 8);
+    const homeX = Math.min(Math.max(0, piece.home?.x ?? Math.random() * maxX), maxX);
+    const homeY = Math.min(Math.max(0, piece.home?.y ?? Math.random() * maxY), maxY);
+
+    els.tray.appendChild(piece.el);
+    piece.el.classList.remove('dragging', 'drag-layer');
+    piece.el.style.left = `${homeX}px`;
+    piece.el.style.top = `${homeY}px`;
+    piece.el.style.width = `${piece.canvasW}px`;
+    piece.el.style.height = `${piece.canvasH}px`;
+    piece.el.style.transform = `rotate(${piece.homeRotation ?? piece.rotation ?? 0}deg)`;
+    piece.container = 'tray';
+
+    if (flash) {
+      piece.el.classList.add('wrong-flash');
+      window.setTimeout(() => piece.el.classList.remove('wrong-flash'), 500);
+    }
+  }
+
   function scatterPieces() {
     const trayRect = els.tray.getBoundingClientRect();
-    state.pieces.forEach((piece, index) => {
-      const el = piece.el;
+    state.pieces.forEach((piece) => {
       const maxX = Math.max(0, trayRect.width - piece.canvasW - 8);
       const maxY = Math.max(0, trayRect.height - piece.canvasH - 8);
       const x = Math.random() * maxX;
       const y = Math.random() * maxY;
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
-      el.style.transform = `rotate(${(Math.random() * 8 - 4).toFixed(1)}deg)`;
-      els.tray.appendChild(el);
       piece.home = { x, y };
-      piece.container = 'tray';
+      piece.rotation = state.difficulty === 'hard'
+        ? [0, 90, 180, 270][Math.floor(Math.random() * 4)]
+        : 0;
+      piece.homeRotation = state.difficulty === 'hard'
+        ? piece.rotation
+        : Number((Math.random() * 8 - 4).toFixed(1));
       piece.locked = false;
-      piece.el.classList.remove('locked');
+      piece.el.classList.remove('locked', 'selected', 'correct-flash', 'wrong-flash');
+      returnPieceToTray(piece);
     });
   }
 
@@ -266,6 +328,7 @@
     state.pieces = [];
     state.solved = 0;
     state.attempts = 0;
+    state.selectedPieceId = null;
 
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
@@ -282,6 +345,8 @@
           targetX: state.board.x + col * pieceW - pad,
           targetY: state.board.y + row * pieceH - pad,
           locked: false,
+          rotation: 0,
+          homeRotation: 0,
           el: null
         };
         piece.el = createPieceCanvas(piece, sourceCanvas);
@@ -294,6 +359,7 @@
     updateCounters();
     updateStatus('Em andamento');
     state.running = true;
+    updateRotationControls();
     els.resetBtn.disabled = false;
     startTimer();
   }
@@ -307,27 +373,37 @@
 
   function bindPieceEvents(el, piece) {
     let dragging = false;
+    let moved = false;
     let offsetX = 0;
     let offsetY = 0;
+    let startClientX = 0;
+    let startClientY = 0;
 
     el.addEventListener('pointerdown', (event) => {
       if (!state.running || piece.locked) return;
       event.preventDefault();
       dragging = true;
+      moved = false;
+      startClientX = event.clientX;
+      startClientY = event.clientY;
+      if (state.difficulty === 'hard') selectPiece(piece);
 
       const rect = el.getBoundingClientRect();
-      offsetX = event.clientX - rect.left;
-      offsetY = event.clientY - rect.top;
+      // Mantém o centro visual da peça mesmo quando ela está girada em 90°/270°.
+      const fixedLeft = rect.left + rect.width / 2 - piece.canvasW / 2;
+      const fixedTop = rect.top + rect.height / 2 - piece.canvasH / 2;
+      offsetX = event.clientX - fixedLeft;
+      offsetY = event.clientY - fixedTop;
 
       // Move a peça para uma camada fixa durante o arraste. Isso evita que ela
       // desapareça ao sair da bandeja ou entrar em um contêiner com overflow.
       document.body.appendChild(el);
       el.classList.add('dragging', 'drag-layer');
-      el.style.left = `${rect.left}px`;
-      el.style.top = `${rect.top}px`;
+      el.style.left = `${fixedLeft}px`;
+      el.style.top = `${fixedTop}px`;
       el.style.width = `${piece.canvasW}px`;
       el.style.height = `${piece.canvasH}px`;
-      el.style.transform = 'rotate(0deg) scale(1.035)';
+      el.style.transform = `rotate(${piece.rotation || 0}deg) scale(1.035)`;
 
       try { el.setPointerCapture(event.pointerId); } catch (_) {}
     });
@@ -335,28 +411,43 @@
     el.addEventListener('pointermove', (event) => {
       if (!dragging || piece.locked) return;
       event.preventDefault();
+      if (Math.hypot(event.clientX - startClientX, event.clientY - startClientY) > 8) moved = true;
       el.style.left = `${event.clientX - offsetX}px`;
       el.style.top = `${event.clientY - offsetY}px`;
     });
 
-    const release = (event) => {
+    const release = (event, cancelled = false) => {
       if (!dragging || piece.locked) return;
       dragging = false;
       try { el.releasePointerCapture(event.pointerId); } catch (_) {}
 
-      const pieceRect = el.getBoundingClientRect();
+      if (cancelled) {
+        returnPieceToTray(piece);
+        updateStatus('Peça devolvida ao monte');
+        return;
+      }
+
+      // No Avançado, um toque curto gira a peça sem registrar uma tentativa.
+      if (state.difficulty === 'hard' && !moved) {
+        rotatePiece(piece);
+        returnPieceToTray(piece);
+        return;
+      }
+
+      const fixedLeft = parseFloat(el.style.left) || 0;
+      const fixedTop = parseFloat(el.style.top) || 0;
       const boardRect = els.boardWrap.getBoundingClientRect();
       els.boardWrap.appendChild(el);
       el.classList.remove('dragging', 'drag-layer');
-      el.style.left = `${pieceRect.left - boardRect.left}px`;
-      el.style.top = `${pieceRect.top - boardRect.top}px`;
-      el.style.transform = 'rotate(0deg)';
+      el.style.left = `${fixedLeft - boardRect.left}px`;
+      el.style.top = `${fixedTop - boardRect.top}px`;
+      el.style.transform = `rotate(${piece.rotation || 0}deg)`;
       piece.container = 'board';
       testDrop(piece);
     };
 
-    el.addEventListener('pointerup', release);
-    el.addEventListener('pointercancel', release);
+    el.addEventListener('pointerup', (event) => release(event));
+    el.addEventListener('pointercancel', (event) => release(event, true));
   }
 
   function testDrop(piece) {
@@ -366,26 +457,35 @@
     const distance = Math.hypot(currentX - piece.targetX, currentY - piece.targetY);
     const tolerance = Math.max(20, Math.min(piece.w, piece.h) * 0.34);
 
-    if (distance <= tolerance) {
+    const rotationCorrect = normalizedRotation(piece.rotation || 0) === 0;
+
+    if (distance <= tolerance && rotationCorrect) {
       piece.el.style.left = `${piece.targetX}px`;
       piece.el.style.top = `${piece.targetY}px`;
+      piece.rotation = 0;
+      piece.homeRotation = 0;
       piece.el.style.transform = 'rotate(0deg)';
       piece.el.classList.add('locked', 'correct-flash');
       piece.locked = true;
+      if (state.selectedPieceId === piece.id) state.selectedPieceId = null;
+      piece.el.classList.remove('selected');
+      updateRotationControls();
       state.solved += 1;
       setTimeout(() => piece.el.classList.remove('correct-flash'), 650);
       updateStatus('Encaixe correto');
       if (state.solved === state.pieces.length) finishGame();
     } else {
-      piece.el.classList.add('wrong-flash');
-      updateStatus('Posição incorreta');
-      setTimeout(() => piece.el.classList.remove('wrong-flash'), 500);
+      returnPieceToTray(piece, { flash: true });
+      updateStatus(distance <= tolerance && !rotationCorrect
+        ? 'Orientação incorreta — gire a peça e tente novamente'
+        : 'Posição incorreta — peça devolvida ao monte');
     }
     updateCounters();
   }
 
   function finishGame() {
     state.running = false;
+    updateRotationControls();
     stopTimer();
     updateStatus('Concluído');
     const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
@@ -420,6 +520,10 @@
   });
 
 
+  document.querySelectorAll('input[name="difficulty"]').forEach((input) => {
+    input.addEventListener('change', updateRotationControls);
+  });
+  els.rotateBtn.addEventListener('click', () => rotatePiece(selectedPiece()));
   els.showGuide.addEventListener('change', updateGuideVisibility);
   els.startBtn.addEventListener('click', buildGame);
   els.resetBtn.addEventListener('click', resetGame);

@@ -55,6 +55,7 @@
       <div class="actions">
         <button id="startBtn" class="primary-btn" disabled>Iniciar jogo</button>
         <button id="resetBtn" class="secondary-btn" disabled>Recomeçar</button>
+        <button id="rotateBtn" class="secondary-btn rotate-btn" type="button" hidden disabled aria-label="Girar peça selecionada em 90 graus">↻ Girar peça</button>
       </div>
     </section>
 
@@ -67,7 +68,7 @@
 
     <section class="game-panel">
       <div class="game-help">
-        <strong>Como jogar:</strong> arraste uma peça para a posição correspondente. Ao soltar, verde indica encaixe correto e vermelho indica posição errada.
+        <strong>Como jogar:</strong> arraste uma peça para a posição correspondente. Ao soltar, verde indica encaixe correto e vermelho indica posição errada. <span id="advancedHelp" hidden>No nível Avançado, toque em uma peça para girá-la 90° ou use o botão “Girar peça”.</span>
       </div>
 
       <div id="workspace" class="workspace" aria-label="Área do quebra-cabeça">
