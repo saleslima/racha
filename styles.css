@@ -156,6 +156,7 @@ input[type="file"] {
 
 .workspace {
   min-height: 630px;
+  scroll-margin-top: .5rem;
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(280px, .8fr);
 }

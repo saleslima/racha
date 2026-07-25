@@ -35,6 +35,7 @@
     confirmOtherImageBtn: document.querySelector('#confirmOtherImageBtn'),
     cancelNewGameBtn: document.querySelector('#cancelNewGameBtn'),
     gamePanel: document.querySelector('.game-panel'),
+    workspace: document.querySelector('#workspace'),
     confettiCanvas: document.querySelector('#confettiCanvas')
   };
 
@@ -59,10 +60,15 @@
   };
 
   function scrollToGameArea() {
-    if (!els.gamePanel) return;
+    const target = els.workspace || els.gamePanel;
+    if (!target) return;
+
+    // No celular, posiciona imediatamente o início da área do quebra-cabeça
+    // para que o usuário já veja onde deve começar a jogar.
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        els.gamePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const top = Math.max(0, target.getBoundingClientRect().top + window.scrollY - 8);
+        window.scrollTo({ top, behavior: 'auto' });
       });
     });
   }
@@ -717,17 +723,20 @@
     closeSuccessModal();
     closeNewGameModal();
     document.documentElement.classList.add('game-reloading');
-    updateStatus('Recarregando o quebra-cabeça…');
+    updateStatus('Recomeçando do zero…');
 
-    // Destrói completamente a rodada atual, mas mantém a imagem carregada.
+    // Ao escolher a mesma imagem, o tabuleiro volta a ficar completamente vazio.
+    // Apenas a imagem continua carregada e todas as peças são recriadas no monte.
+    els.showGuide.checked = false;
+    updateGuideVisibility();
     clearBoard({ clearImage: false });
     state.board = { x: 0, y: 0, width: 0, height: 0 };
     state.startedAt = 0;
 
-    // Aguarda o navegador limpar e redesenhar a área antes de criar tudo de novo.
+    // Aguarda a limpeza visual e recria a rodada desde o zero.
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        buildGame();
+        buildGame({ autoScroll: true });
         document.documentElement.classList.remove('game-reloading');
       });
     });
