@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b21b6" />
+  <meta name="description" content="Racha Cuca — PWA de quebra-cabeça com imagem enviada pelo usuário." />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Racha Cuca</title>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">PWA OFFLINE</p>
+      <h1>Racha Cuca</h1>
+      <p class="subtitle">Envie uma imagem, escolha a dificuldade e encaixe as peças.</p>
+    </div>
+    <button id="installBtn" class="ghost-btn" hidden>Instalar</button>
+  </header>
+
+  <main class="app-shell">
+    <section class="control-panel" aria-label="Configuração do jogo">
+      <div class="field-group upload-group">
+        <label for="imageInput">Imagem do quebra-cabeça</label>
+        <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp" />
+        <small>Selecione um arquivo do dispositivo. A câmera não é aberta.</small>
+      </div>
+
+      <fieldset class="difficulty-group">
+        <legend>Nível de dificuldade</legend>
+        <label class="difficulty-card">
+          <input type="radio" name="difficulty" value="easy" checked />
+          <span><strong>Fácil</strong><small>10 peças</small></span>
+        </label>
+        <label class="difficulty-card">
+          <input type="radio" name="difficulty" value="medium" />
+          <span><strong>Médio</strong><small>30 peças</small></span>
+        </label>
+        <label class="difficulty-card">
+          <input type="radio" name="difficulty" value="hard" />
+          <span><strong>Avançado</strong><small>60 peças</small></span>
+        </label>
+      </fieldset>
+
+      <div class="actions">
+        <button id="startBtn" class="primary-btn" disabled>Iniciar jogo</button>
+        <button id="resetBtn" class="secondary-btn" disabled>Recomeçar</button>
+      </div>
+    </section>
+
+    <section class="status-panel" aria-live="polite">
+      <div><span>Progresso</span><strong id="progressText">0/0</strong></div>
+      <div><span>Tentativas</span><strong id="attemptsText">0</strong></div>
+      <div><span>Tempo</span><strong id="timerText">00:00</strong></div>
+      <div><span>Status</span><strong id="statusText">Envie uma imagem</strong></div>
+    </section>
+
+    <section class="game-panel">
+      <div class="game-help">
+        <strong>Como jogar:</strong> arraste uma peça para a posição correspondente. Ao soltar, verde indica encaixe correto e vermelho indica posição errada.
+      </div>
+
+      <div id="workspace" class="workspace" aria-label="Área do quebra-cabeça">
+        <div id="boardWrap" class="board-wrap">
+          <canvas id="guideCanvas" aria-label="Base do quebra-cabeça"></canvas>
+          <div id="board" class="board"></div>
+          <div id="emptyState" class="empty-state">
+            <div class="empty-icon">🧩</div>
+            <p>O quebra-cabeça aparecerá aqui.</p>
+          </div>
+        </div>
+
+        <aside class="tray-wrap">
+          <div class="tray-title">
+            <h2>Peças</h2>
+            <span id="trayCount">0 disponíveis</span>
+          </div>
+          <div id="tray" class="tray"></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">Criado por Marcio Sales Lima</footer>
+
+  <div id="successModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+      <div class="success-icon">✓</div>
+      <h2 id="successTitle">Quebra-cabeça concluído!</h2>
+      <p id="successSummary"></p>
+      <button id="playAgainBtn" class="primary-btn">Jogar novamente</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
