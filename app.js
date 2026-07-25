@@ -16,6 +16,7 @@
     installBtn: document.querySelector('#installBtn'),
     showGuide: document.querySelector('#showGuide'),
     guideCanvas: document.querySelector('#guideCanvas'),
+    finalCanvas: document.querySelector('#finalCanvas'),
     board: document.querySelector('#board'),
     boardWrap: document.querySelector('#boardWrap'),
     tray: document.querySelector('#tray'),
@@ -44,7 +45,8 @@
     deferredPrompt: null,
     resizeTimer: null,
     showGuide: true,
-    selectedPieceId: null
+    selectedPieceId: null,
+    sourceCanvas: null
   };
 
   function selectedDifficulty() {
@@ -229,6 +231,67 @@
     return canvas;
   }
 
+  function renderLockedPiece(piece) {
+    if (!piece?.el || !state.sourceCanvas) return;
+    const scale = window.devicePixelRatio || 1;
+    piece.el.width = Math.ceil(piece.w * scale);
+    piece.el.height = Math.ceil(piece.h * scale);
+    piece.el.style.width = `${piece.w}px`;
+    piece.el.style.height = `${piece.h}px`;
+    const ctx = piece.el.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, piece.el.width, piece.el.height);
+    ctx.scale(scale, scale);
+    ctx.drawImage(
+      state.sourceCanvas,
+      piece.srcX,
+      piece.srcY,
+      piece.w,
+      piece.h,
+      0,
+      0,
+      piece.w,
+      piece.h
+    );
+  }
+
+
+
+  function hideFinalPreview() {
+    if (!els.finalCanvas) return;
+    els.finalCanvas.hidden = true;
+    const ctx = els.finalCanvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, els.finalCanvas.width, els.finalCanvas.height);
+  }
+
+  function renderFinalPreview() {
+    if (!els.finalCanvas || !state.sourceCanvas) return;
+    const { width, height, x, y } = state.board;
+    const scale = window.devicePixelRatio || 1;
+    els.finalCanvas.width = Math.round(width * scale);
+    els.finalCanvas.height = Math.round(height * scale);
+    els.finalCanvas.style.width = `${width}px`;
+    els.finalCanvas.style.height = `${height}px`;
+    els.finalCanvas.style.left = `${x}px`;
+    els.finalCanvas.style.top = `${y}px`;
+
+    const ctx = els.finalCanvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, els.finalCanvas.width, els.finalCanvas.height);
+    ctx.scale(scale, scale);
+    ctx.drawImage(state.sourceCanvas, 0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.36)';
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    state.pieces.forEach((piece) => {
+      makePiecePath(ctx, piece.srcX, piece.srcY, piece.w, piece.h, piece.tab, piece.edges);
+      ctx.stroke();
+    });
+
+    els.finalCanvas.hidden = false;
+  }
+
   function renderGuide(sourceCanvas) {
     const { width, height } = state.board;
     const scale = window.devicePixelRatio || 1;
@@ -312,13 +375,19 @@
     els.board.innerHTML = '';
     els.tray.innerHTML = '';
     els.emptyState.hidden = true;
+    hideFinalPreview();
     els.guideCanvas.style.left = `${state.board.x}px`;
     els.guideCanvas.style.top = `${state.board.y}px`;
+    if (els.finalCanvas) {
+      els.finalCanvas.style.left = `${state.board.x}px`;
+      els.finalCanvas.style.top = `${state.board.y}px`;
+    }
 
     const sourceCanvas = document.createElement('canvas');
     sourceCanvas.width = dimensions.width;
     sourceCanvas.height = dimensions.height;
     sourceCanvas.getContext('2d').drawImage(state.image, 0, 0, dimensions.width, dimensions.height);
+    state.sourceCanvas = sourceCanvas;
     renderGuide(sourceCanvas);
 
     state.pieces = [];
@@ -462,11 +531,12 @@
     const rotationCorrect = normalizedRotation(piece.rotation || 0) === 0;
 
     if (distance <= tolerance && rotationCorrect) {
-      piece.el.style.left = `${piece.targetX}px`;
-      piece.el.style.top = `${piece.targetY}px`;
       piece.rotation = 0;
       piece.homeRotation = 0;
       piece.el.style.transform = 'rotate(0deg)';
+      renderLockedPiece(piece);
+      piece.el.style.left = `${state.board.x + piece.srcX}px`;
+      piece.el.style.top = `${state.board.y + piece.srcY}px`;
       piece.el.classList.add('locked', 'correct-flash');
       piece.locked = true;
       if (state.selectedPieceId === piece.id) state.selectedPieceId = null;
@@ -489,6 +559,7 @@
     state.running = false;
     updateRotationControls();
     stopTimer();
+    renderFinalPreview();
     updateStatus('Concluído');
     const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
     els.successSummary.textContent = `Nível ${CONFIG[state.difficulty].label}, ${state.pieces.length} peças, ${state.attempts} tentativas e tempo de ${formatTime(seconds)}.`;

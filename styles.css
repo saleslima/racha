@@ -174,12 +174,14 @@ input[type="file"] {
 }
 
 #guideCanvas,
+#finalCanvas,
 .board {
   position: absolute;
   touch-action: none;
 }
 
 #guideCanvas { opacity: .16; pointer-events: none; }
+#finalCanvas { pointer-events: none; z-index: 1200; }
 .board { inset: 0; }
 
 .empty-state { text-align: center; color: var(--muted); }
