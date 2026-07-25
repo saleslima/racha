@@ -28,7 +28,12 @@
     trayCount: document.querySelector('#trayCount'),
     successModal: document.querySelector('#successModal'),
     successSummary: document.querySelector('#successSummary'),
-    playAgainBtn: document.querySelector('#playAgainBtn')
+    sameImageBtn: document.querySelector('#sameImageBtn'),
+    otherImageBtn: document.querySelector('#otherImageBtn'),
+    newGameModal: document.querySelector('#newGameModal'),
+    confirmSameImageBtn: document.querySelector('#confirmSameImageBtn'),
+    confirmOtherImageBtn: document.querySelector('#confirmOtherImageBtn'),
+    cancelNewGameBtn: document.querySelector('#cancelNewGameBtn')
   };
 
   const state = {
@@ -528,31 +533,100 @@
     const distance = Math.hypot(currentX - piece.targetX, currentY - piece.targetY);
     const tolerance = Math.max(20, Math.min(piece.w, piece.h) * 0.34);
 
-    const rotationCorrect = normalizedRotation(piece.rotation || 0) === 0;
+    const autoRotated = normalizedRotation(piece.rotation || 0) !== 0;
 
-    if (distance <= tolerance && rotationCorrect) {
+    if (distance <= tolerance) {
+      piece.locked = true;
       piece.rotation = 0;
       piece.homeRotation = 0;
+      piece.el.style.left = `${piece.targetX}px`;
+      piece.el.style.top = `${piece.targetY}px`;
       piece.el.style.transform = 'rotate(0deg)';
-      renderLockedPiece(piece);
-      piece.el.style.left = `${state.board.x + piece.srcX}px`;
-      piece.el.style.top = `${state.board.y + piece.srcY}px`;
-      piece.el.classList.add('locked', 'correct-flash');
-      piece.locked = true;
       if (state.selectedPieceId === piece.id) state.selectedPieceId = null;
       piece.el.classList.remove('selected');
       updateRotationControls();
-      state.solved += 1;
-      setTimeout(() => piece.el.classList.remove('correct-flash'), 650);
-      updateStatus('Encaixe correto');
-      if (state.solved === state.pieces.length) finishGame();
+
+      const finalizeLock = () => {
+        renderLockedPiece(piece);
+        piece.el.style.left = `${state.board.x + piece.srcX}px`;
+        piece.el.style.top = `${state.board.y + piece.srcY}px`;
+        piece.el.classList.add('locked', 'correct-flash');
+        state.solved += 1;
+        updateCounters();
+        setTimeout(() => piece.el.classList.remove('correct-flash'), 650);
+        updateStatus(autoRotated ? 'Peça girou e encaixou corretamente' : 'Encaixe correto');
+        if (state.solved === state.pieces.length) finishGame();
+      };
+
+      if (autoRotated) {
+        setTimeout(finalizeLock, 170);
+      } else {
+        finalizeLock();
+      }
     } else {
       returnPieceToTray(piece, { flash: true });
-      updateStatus(distance <= tolerance && !rotationCorrect
-        ? 'Orientação incorreta — gire a peça e tente novamente'
-        : 'Posição incorreta — peça devolvida ao monte');
+      updateStatus('Posição incorreta — peça devolvida ao monte');
+      updateCounters();
+    }
+  }
+
+  function closeSuccessModal() {
+    els.successModal.hidden = true;
+  }
+
+  function closeNewGameModal() {
+    if (els.newGameModal) els.newGameModal.hidden = true;
+  }
+
+  function openNewGameModal() {
+    if (!state.image) return;
+    closeSuccessModal();
+    if (els.newGameModal) els.newGameModal.hidden = false;
+  }
+
+  function clearGuideCanvas() {
+    const ctx = els.guideCanvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, els.guideCanvas.width, els.guideCanvas.height);
+  }
+
+  function clearBoard({ clearImage = false } = {}) {
+    stopTimer();
+    state.running = false;
+    state.pieces = [];
+    state.solved = 0;
+    state.attempts = 0;
+    state.selectedPieceId = null;
+    state.sourceCanvas = null;
+    els.board.innerHTML = '';
+    els.tray.innerHTML = '';
+    els.emptyState.hidden = false;
+    hideFinalPreview();
+    clearGuideCanvas();
+    els.timerText.textContent = '00:00';
+    if (clearImage) {
+      if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+      state.imageUrl = null;
+      state.image = null;
+      els.imageInput.value = '';
     }
     updateCounters();
+    updateRotationControls();
+    els.startBtn.disabled = !state.image;
+    els.resetBtn.disabled = !state.image;
+    updateStatus(state.image ? 'Imagem pronta' : 'Envie uma imagem');
+  }
+
+  function startNewGameWithSameImage() {
+    closeSuccessModal();
+    closeNewGameModal();
+    if (state.image) buildGame();
+  }
+
+  function startNewGameWithOtherImage() {
+    closeSuccessModal();
+    closeNewGameModal();
+    clearBoard({ clearImage: true });
   }
 
   function finishGame() {
@@ -568,7 +642,7 @@
 
   function resetGame() {
     if (!state.image) return;
-    buildGame();
+    openNewGameModal();
   }
 
   function loadImageFile(file) {
@@ -600,14 +674,21 @@
   els.showGuide.addEventListener('change', updateGuideVisibility);
   els.startBtn.addEventListener('click', buildGame);
   els.resetBtn.addEventListener('click', resetGame);
-  els.playAgainBtn.addEventListener('click', () => {
-    els.successModal.hidden = true;
-    resetGame();
-  });
+  els.sameImageBtn.addEventListener('click', startNewGameWithSameImage);
+  els.otherImageBtn.addEventListener('click', startNewGameWithOtherImage);
+  els.confirmSameImageBtn.addEventListener('click', startNewGameWithSameImage);
+  els.confirmOtherImageBtn.addEventListener('click', startNewGameWithOtherImage);
+  els.cancelNewGameBtn.addEventListener('click', closeNewGameModal);
 
   els.successModal.addEventListener('click', (event) => {
-    if (event.target === els.successModal) els.successModal.hidden = true;
+    if (event.target === els.successModal) closeSuccessModal();
   });
+
+  if (els.newGameModal) {
+    els.newGameModal.addEventListener('click', (event) => {
+      if (event.target === els.newGameModal) closeNewGameModal();
+    });
+  }
 
   window.addEventListener('resize', () => {
     if (!state.running || !state.image) return;

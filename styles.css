@@ -486,3 +486,17 @@ input[type="file"] {
   .guide-option { width: 100%; }
   .switch-row { width: 100%; justify-content: flex-start; }
 }
+
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+
+.modal-actions .primary-btn,
+.modal-actions .secondary-btn,
+.modal-actions .ghost-btn {
+  width: 100%;
+}

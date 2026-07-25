@@ -100,7 +100,22 @@
       <div class="success-icon">✓</div>
       <h2 id="successTitle">Quebra-cabeça concluído!</h2>
       <p id="successSummary"></p>
-      <button id="playAgainBtn" class="primary-btn">Jogar novamente</button>
+      <div class="modal-actions">
+        <button id="sameImageBtn" class="primary-btn">Novo jogo com a mesma imagem</button>
+        <button id="otherImageBtn" class="secondary-btn">Escolher outra imagem</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="newGameModal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="newGameTitle">
+      <h2 id="newGameTitle">Iniciar novo jogo?</h2>
+      <p>Você quer continuar com a mesma imagem ou escolher outra?</p>
+      <div class="modal-actions">
+        <button id="confirmSameImageBtn" class="primary-btn">Manter a mesma imagem</button>
+        <button id="confirmOtherImageBtn" class="secondary-btn">Escolher outra imagem</button>
+        <button id="cancelNewGameBtn" class="ghost-btn">Cancelar</button>
+      </div>
     </div>
   </div>
 
