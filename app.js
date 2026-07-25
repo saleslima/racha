@@ -33,7 +33,9 @@
     newGameModal: document.querySelector('#newGameModal'),
     confirmSameImageBtn: document.querySelector('#confirmSameImageBtn'),
     confirmOtherImageBtn: document.querySelector('#confirmOtherImageBtn'),
-    cancelNewGameBtn: document.querySelector('#cancelNewGameBtn')
+    cancelNewGameBtn: document.querySelector('#cancelNewGameBtn'),
+    gamePanel: document.querySelector('.game-panel'),
+    confettiCanvas: document.querySelector('#confettiCanvas')
   };
 
   const state = {
@@ -51,8 +53,98 @@
     resizeTimer: null,
     showGuide: true,
     selectedPieceId: null,
-    sourceCanvas: null
+    sourceCanvas: null,
+    confettiFrame: null,
+    confettiStopTimer: null
   };
+
+  function scrollToGameArea() {
+    if (!els.gamePanel) return;
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        els.gamePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+  }
+
+  function stopConfetti() {
+    if (state.confettiFrame) window.cancelAnimationFrame(state.confettiFrame);
+    if (state.confettiStopTimer) window.clearTimeout(state.confettiStopTimer);
+    state.confettiFrame = null;
+    state.confettiStopTimer = null;
+    if (!els.confettiCanvas) return;
+    const ctx = els.confettiCanvas.getContext('2d');
+    ctx?.clearRect(0, 0, els.confettiCanvas.width, els.confettiCanvas.height);
+    els.confettiCanvas.hidden = true;
+  }
+
+  function launchConfetti() {
+    const canvas = els.confettiCanvas;
+    if (!canvas) return;
+    stopConfetti();
+
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    canvas.hidden = false;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const palette = ['#6d28d9', '#16a34a', '#f59e0b', '#ec4899', '#0ea5e9', '#ef4444'];
+    const pieces = Array.from({ length: 150 }, () => ({
+      x: Math.random() * width,
+      y: -20 - Math.random() * height * 0.45,
+      w: 5 + Math.random() * 8,
+      h: 7 + Math.random() * 10,
+      vx: -2.2 + Math.random() * 4.4,
+      vy: 2.5 + Math.random() * 4.5,
+      gravity: 0.035 + Math.random() * 0.055,
+      rotation: Math.random() * Math.PI * 2,
+      spin: -0.18 + Math.random() * 0.36,
+      color: palette[Math.floor(Math.random() * palette.length)],
+      opacity: 0.85 + Math.random() * 0.15
+    }));
+
+    const started = performance.now();
+    const duration = 4200;
+
+    const animate = (now) => {
+      const elapsed = now - started;
+      ctx.clearRect(0, 0, width, height);
+
+      pieces.forEach((piece) => {
+        piece.vy += piece.gravity;
+        piece.x += piece.vx;
+        piece.y += piece.vy;
+        piece.rotation += piece.spin;
+
+        if (piece.x < -30) piece.x = width + 30;
+        if (piece.x > width + 30) piece.x = -30;
+
+        const fade = elapsed > duration - 850 ? Math.max(0, (duration - elapsed) / 850) : 1;
+        ctx.save();
+        ctx.globalAlpha = piece.opacity * fade;
+        ctx.translate(piece.x, piece.y);
+        ctx.rotate(piece.rotation);
+        ctx.fillStyle = piece.color;
+        ctx.fillRect(-piece.w / 2, -piece.h / 2, piece.w, piece.h);
+        ctx.restore();
+      });
+
+      if (elapsed < duration) {
+        state.confettiFrame = window.requestAnimationFrame(animate);
+      } else {
+        stopConfetti();
+      }
+    };
+
+    state.confettiFrame = window.requestAnimationFrame(animate);
+    state.confettiStopTimer = window.setTimeout(stopConfetti, duration + 300);
+  }
 
   function selectedDifficulty() {
     return document.querySelector('input[name="difficulty"]:checked')?.value || 'easy';
@@ -357,7 +449,7 @@
     });
   }
 
-  function buildGame() {
+  function buildGame({ autoScroll = true } = {}) {
     if (!state.image) return;
 
     state.difficulty = selectedDifficulty();
@@ -438,6 +530,7 @@
     updateRotationControls();
     els.resetBtn.disabled = false;
     startTimer();
+    if (autoScroll) scrollToGameArea();
   }
 
   function shuffle(array) {
@@ -591,6 +684,7 @@
   }
 
   function clearBoard({ clearImage = false } = {}) {
+    stopConfetti();
     stopTimer();
     state.running = false;
     state.pieces = [];
@@ -618,9 +712,25 @@
   }
 
   function startNewGameWithSameImage() {
+    if (!state.image) return;
+
     closeSuccessModal();
     closeNewGameModal();
-    if (state.image) buildGame();
+    document.documentElement.classList.add('game-reloading');
+    updateStatus('Recarregando o quebra-cabeça…');
+
+    // Destrói completamente a rodada atual, mas mantém a imagem carregada.
+    clearBoard({ clearImage: false });
+    state.board = { x: 0, y: 0, width: 0, height: 0 };
+    state.startedAt = 0;
+
+    // Aguarda o navegador limpar e redesenhar a área antes de criar tudo de novo.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        buildGame();
+        document.documentElement.classList.remove('game-reloading');
+      });
+    });
   }
 
   function startNewGameWithOtherImage() {
@@ -634,10 +744,11 @@
     updateRotationControls();
     stopTimer();
     renderFinalPreview();
-    updateStatus('Concluído');
+    updateStatus('Parabéns!');
     const seconds = Math.floor((Date.now() - state.startedAt) / 1000);
-    els.successSummary.textContent = `Nível ${CONFIG[state.difficulty].label}, ${state.pieces.length} peças, ${state.attempts} tentativas e tempo de ${formatTime(seconds)}.`;
+    els.successSummary.textContent = `Você concluiu o nível ${CONFIG[state.difficulty].label} com ${state.pieces.length} peças, ${state.attempts} tentativas e tempo de ${formatTime(seconds)}.`;
     els.successModal.hidden = false;
+    launchConfetti();
   }
 
   function resetGame() {
@@ -646,6 +757,7 @@
   }
 
   function loadImageFile(file) {
+    stopConfetti();
     if (!file || !file.type.startsWith('image/')) {
       updateStatus('Arquivo inválido');
       return;
@@ -693,7 +805,7 @@
   window.addEventListener('resize', () => {
     if (!state.running || !state.image) return;
     clearTimeout(state.resizeTimer);
-    state.resizeTimer = setTimeout(buildGame, 250);
+    state.resizeTimer = setTimeout(() => buildGame({ autoScroll: false }), 250);
   });
 
   window.addEventListener('beforeinstallprompt', (event) => {

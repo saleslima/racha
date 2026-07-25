@@ -1,4 +1,4 @@
-const CACHE_NAME = 'racha-cuca-pwa-v10';
+const CACHE_NAME = 'racha-cuca-pwa-v12';
 const APP_SHELL = [
   './',
   './index.html',
