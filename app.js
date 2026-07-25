@@ -214,8 +214,8 @@
     ctx.clip();
     ctx.drawImage(
       sourceCanvas,
-      piece.col * piece.w - piece.pad,
-      piece.row * piece.h - piece.pad,
+      piece.srcX - piece.pad,
+      piece.srcY - piece.pad,
       piece.canvasW,
       piece.canvasH,
       0, 0,
@@ -224,12 +224,6 @@
     );
     ctx.restore();
 
-    ctx.save();
-    makePiecePath(ctx, piece.pad, piece.pad, piece.w, piece.h, piece.tab, piece.edges);
-    ctx.strokeStyle = 'rgba(255,255,255,.8)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-    ctx.restore();
 
     bindPieceEvents(canvas, piece);
     return canvas;
@@ -301,16 +295,18 @@
     state.difficulty = selectedDifficulty();
     const { rows, cols } = CONFIG[state.difficulty];
     const dimensions = fitBoard(state.image, els.boardWrap);
-    const pieceW = dimensions.width / cols;
-    const pieceH = dimensions.height / rows;
-    const tab = Math.min(pieceW, pieceH) * 0.22;
+    const colStarts = Array.from({ length: cols + 1 }, (_, index) => Math.round(index * dimensions.width / cols));
+    const rowStarts = Array.from({ length: rows + 1 }, (_, index) => Math.round(index * dimensions.height / rows));
+    const sampleW = Math.max(1, colStarts[1] - colStarts[0]);
+    const sampleH = Math.max(1, rowStarts[1] - rowStarts[0]);
+    const tab = Math.min(sampleW, sampleH) * 0.22;
     const pad = Math.ceil(tab + 3);
 
     state.board = {
       width: dimensions.width,
       height: dimensions.height,
-      x: (els.boardWrap.clientWidth - dimensions.width) / 2,
-      y: (els.boardWrap.clientHeight - dimensions.height) / 2
+      x: Math.round((els.boardWrap.clientWidth - dimensions.width) / 2),
+      y: Math.round((els.boardWrap.clientHeight - dimensions.height) / 2)
     };
 
     els.board.innerHTML = '';
@@ -333,8 +329,14 @@
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const id = `${row}-${col}`;
+        const srcX = colStarts[col];
+        const srcY = rowStarts[row];
+        const pieceW = Math.max(1, colStarts[col + 1] - srcX);
+        const pieceH = Math.max(1, rowStarts[row + 1] - srcY);
         const piece = {
           id, row, col,
+          srcX,
+          srcY,
           w: pieceW,
           h: pieceH,
           tab,
@@ -342,8 +344,8 @@
           canvasW: pieceW + pad * 2,
           canvasH: pieceH + pad * 2,
           edges: getEdges(row, col, rows, cols),
-          targetX: state.board.x + col * pieceW - pad,
-          targetY: state.board.y + row * pieceH - pad,
+          targetX: state.board.x + srcX - pad,
+          targetY: state.board.y + srcY - pad,
           locked: false,
           rotation: 0,
           homeRotation: 0,
