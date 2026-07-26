@@ -360,6 +360,15 @@
 
 
 
+  function removePuzzlePieces() {
+    // Durante o arraste e após o encaixe, as peças podem ficar diretamente
+    // no body ou no boardWrap. Removê-las só pelo conteúdo de #board não
+    // limpa essas peças, fazendo a imagem colorida anterior permanecer.
+    document.querySelectorAll('canvas.piece').forEach((pieceElement) => {
+      pieceElement.remove();
+    });
+  }
+
   function hideFinalPreview() {
     if (!els.finalCanvas) return;
     els.finalCanvas.hidden = true;
@@ -395,16 +404,100 @@
     els.finalCanvas.hidden = false;
   }
 
+  function createOutlineCanvas(sourceCanvas) {
+    const width = sourceCanvas.width;
+    const height = sourceCanvas.height;
+    const inputCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+    const input = inputCtx.getImageData(0, 0, width, height);
+    const grayscale = new Float32Array(width * height);
+    const blurred = new Float32Array(width * height);
+
+    for (let index = 0; index < grayscale.length; index++) {
+      const offset = index * 4;
+      const alpha = input.data[offset + 3] / 255;
+      const luminance = (
+        input.data[offset] * 0.299 +
+        input.data[offset + 1] * 0.587 +
+        input.data[offset + 2] * 0.114
+      );
+      grayscale[index] = luminance * alpha + 255 * (1 - alpha);
+    }
+    blurred.set(grayscale);
+
+    // Suavização leve para reduzir ruído antes de detectar os contornos.
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        let sum = 0;
+        for (let offsetY = -1; offsetY <= 1; offsetY++) {
+          const row = (y + offsetY) * width;
+          for (let offsetX = -1; offsetX <= 1; offsetX++) {
+            sum += grayscale[row + x + offsetX];
+          }
+        }
+        blurred[y * width + x] = sum / 9;
+      }
+    }
+
+    const magnitudes = new Float32Array(width * height);
+    let magnitudeSum = 0;
+    let sampledPixels = 0;
+
+    // Filtro Sobel: transforma mudanças de luminosidade em linhas de contorno.
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const top = (y - 1) * width;
+        const middle = y * width;
+        const bottom = (y + 1) * width;
+
+        const gx =
+          -blurred[top + x - 1] + blurred[top + x + 1] +
+          -2 * blurred[middle + x - 1] + 2 * blurred[middle + x + 1] +
+          -blurred[bottom + x - 1] + blurred[bottom + x + 1];
+        const gy =
+          -blurred[top + x - 1] - 2 * blurred[top + x] - blurred[top + x + 1] +
+          blurred[bottom + x - 1] + 2 * blurred[bottom + x] + blurred[bottom + x + 1];
+
+        const magnitude = Math.hypot(gx, gy);
+        magnitudes[middle + x] = magnitude;
+        magnitudeSum += magnitude;
+        sampledPixels += 1;
+      }
+    }
+
+    const averageMagnitude = sampledPixels ? magnitudeSum / sampledPixels : 0;
+    const threshold = Math.max(34, Math.min(82, averageMagnitude * 1.85));
+    const outline = document.createElement('canvas');
+    outline.width = width;
+    outline.height = height;
+    const outlineCtx = outline.getContext('2d');
+    const output = outlineCtx.createImageData(width, height);
+
+    for (let index = 0; index < magnitudes.length; index++) {
+      const offset = index * 4;
+      const value = magnitudes[index] >= threshold ? 0 : 255;
+      output.data[offset] = value;
+      output.data[offset + 1] = value;
+      output.data[offset + 2] = value;
+      output.data[offset + 3] = 255;
+    }
+
+    outlineCtx.putImageData(output, 0, 0);
+    return outline;
+  }
+
   function renderGuide(sourceCanvas) {
     const { width, height } = state.board;
     const scale = window.devicePixelRatio || 1;
-    els.guideCanvas.width = width * scale;
-    els.guideCanvas.height = height * scale;
+    els.guideCanvas.width = Math.round(width * scale);
+    els.guideCanvas.height = Math.round(height * scale);
     els.guideCanvas.style.width = `${width}px`;
     els.guideCanvas.style.height = `${height}px`;
     const ctx = els.guideCanvas.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, els.guideCanvas.width, els.guideCanvas.height);
     ctx.scale(scale, scale);
-    ctx.drawImage(sourceCanvas, 0, 0, width, height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(createOutlineCanvas(sourceCanvas), 0, 0, width, height);
     updateGuideVisibility();
   }
 
@@ -457,6 +550,23 @@
 
   function buildGame({ autoScroll = true } = {}) {
     if (!state.image) return;
+
+    // Toda nova partida começa do zero, mesmo quando já havia peças montadas.
+    stopConfetti();
+    stopTimer();
+    closeSuccessModal();
+    closeNewGameModal();
+    removePuzzlePieces();
+    hideFinalPreview();
+    state.running = false;
+    state.pieces = [];
+    state.solved = 0;
+    state.attempts = 0;
+    state.selectedPieceId = null;
+    state.startedAt = 0;
+    els.timerText.textContent = '00:00';
+    updateCounters();
+    updateRotationControls();
 
     state.difficulty = selectedDifficulty();
     const { rows, cols } = CONFIG[state.difficulty];
@@ -692,12 +802,14 @@
   function clearBoard({ clearImage = false } = {}) {
     stopConfetti();
     stopTimer();
+    removePuzzlePieces();
     state.running = false;
     state.pieces = [];
     state.solved = 0;
     state.attempts = 0;
     state.selectedPieceId = null;
     state.sourceCanvas = null;
+    state.board = { x: 0, y: 0, width: 0, height: 0 };
     els.board.innerHTML = '';
     els.tray.innerHTML = '';
     els.emptyState.hidden = false;
@@ -720,32 +832,23 @@
   function startNewGameWithSameImage() {
     if (!state.image) return;
 
+    // Substitui imediatamente a imagem final colorida pelo gabarito
+    // preto e branco e recria todas as peças com o progresso zerado.
     closeSuccessModal();
     closeNewGameModal();
-    document.documentElement.classList.add('game-reloading');
-    updateStatus('Recomeçando do zero…');
-
-    // Ao escolher a mesma imagem, o tabuleiro volta a ficar completamente vazio.
-    // Apenas a imagem continua carregada e todas as peças são recriadas no monte.
     els.showGuide.checked = true;
     updateGuideVisibility();
-    clearBoard({ clearImage: false });
-    state.board = { x: 0, y: 0, width: 0, height: 0 };
-    state.startedAt = 0;
-
-    // Aguarda a limpeza visual e recria a rodada desde o zero.
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        buildGame({ autoScroll: true });
-        document.documentElement.classList.remove('game-reloading');
-      });
-    });
+    buildGame({ autoScroll: true });
   }
 
   function startNewGameWithOtherImage() {
     closeSuccessModal();
     closeNewGameModal();
+
+    // Remove a imagem final e todas as peças. Se o seletor for cancelado,
+    // a área do quebra-cabeça permanece vazia, como esperado.
     clearBoard({ clearImage: true });
+    els.imageInput.click();
   }
 
   function finishGame() {

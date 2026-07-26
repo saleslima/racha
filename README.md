@@ -6,6 +6,10 @@ Criado por Marcio Sales Lima.
 
 ## Recursos
 - Upload de imagem por arquivo, sem abertura da câmera.
+- Ao iniciar, o gabarito aparece em preto e branco, somente com os contornos da imagem.
+- Iniciar uma partida sempre zera peças montadas, tentativas, progresso e tempo.
+- Ao escolher a mesma imagem após concluir, a imagem colorida final é removida e o gabarito preto e branco reaparece com todas as peças zeradas.
+- Ao escolher outra imagem, tabuleiro, gabarito e peças anteriores são apagados antes de abrir o seletor de arquivos.
 - Fácil: 10 peças.
 - Médio: 30 peças.
 - Avançado: 60 peças com rotação em 0°, 90°, 180° e 270°.
